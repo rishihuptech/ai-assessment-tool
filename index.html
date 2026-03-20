@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Readiness Assessment — HuptechWeb</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: { brand: { DEFAULT: '#7C3AED', light: '#EDE9FE', dark: '#5B21B6' } }
+        }
+      }
+    }
+  </script>
+  <style>
+    @keyframes pulse-red { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .pulse-red { animation: pulse-red 1s ease-in-out infinite; }
+  </style>
+</head>
+<body class="bg-gray-50 font-sans text-gray-900 antialiased">
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+</html>
