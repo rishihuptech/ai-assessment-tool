@@ -40,9 +40,17 @@ db.exec(`
     answers TEXT NOT NULL,
     details TEXT NOT NULL,
     want_to_learn INTEGER DEFAULT 0,
+    suggestions TEXT DEFAULT '',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )
 `);
+
+// Migration: add suggestions column if missing
+try {
+  db.exec(`ALTER TABLE assessments ADD COLUMN suggestions TEXT DEFAULT ''`);
+} catch (e) {
+  // Column already exists, ignore
+}
 
 // Auth middleware
 function requireAdmin(req, res, next) {
@@ -54,12 +62,12 @@ function requireAdmin(req, res, next) {
 // Submit assessment
 app.post('/api/submit', (req, res) => {
   try {
-    const { name, email, role, type, category, score, percentage, tier, tier_code, action, time_taken, pillar_scores, answers, details, want_to_learn } = req.body;
+    const { name, email, role, type, category, score, percentage, tier, tier_code, action, time_taken, pillar_scores, answers, details, want_to_learn, suggestions } = req.body;
     const stmt = db.prepare(`
-      INSERT INTO assessments (name, email, role, type, category, score, percentage, tier, tier_code, action, time_taken, pillar_scores, answers, details, want_to_learn)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO assessments (name, email, role, type, category, score, percentage, tier, tier_code, action, time_taken, pillar_scores, answers, details, want_to_learn, suggestions)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    const result = stmt.run(name, email || '', role, type, category, score, percentage, tier, tier_code, action, time_taken, JSON.stringify(pillar_scores), JSON.stringify(answers), JSON.stringify(details), want_to_learn || 0);
+    const result = stmt.run(name, email || '', role, type, category, score, percentage, tier, tier_code, action, time_taken, JSON.stringify(pillar_scores), JSON.stringify(answers), JSON.stringify(details), want_to_learn || 0, suggestions || '');
     res.json({ success: true, id: result.lastInsertRowid });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -86,10 +94,10 @@ app.get('/api/results', requireAdmin, (req, res) => {
 app.get('/api/results/export', requireAdmin, (req, res) => {
   try {
     const rows = db.prepare('SELECT * FROM assessments ORDER BY created_at DESC').all();
-    const headers = ['Name', 'Email', 'Role', 'Type', 'Category', 'Score', 'Percentage', 'Tier', 'Action', 'Time Taken (s)', 'Want to Learn', 'P1: Tool Awareness', 'P2: Prompt Craft', 'P3: Workflow Integration', 'P4: Critical Thinking', 'P5: Adaptability', 'P6: AI-First Mindset', 'Date'];
+    const headers = ['Name', 'Email', 'Role', 'Type', 'Category', 'Score', 'Percentage', 'Tier', 'Action', 'Time Taken (s)', 'Want to Learn', 'P1: Tool Awareness', 'P2: Prompt Craft', 'P3: Workflow Integration', 'P4: Critical Thinking', 'P5: Adaptability', 'P6: AI-First Mindset', 'Suggestions', 'Date'];
     const csvRows = rows.map(r => {
       const ps = JSON.parse(r.pillar_scores);
-      return [r.name, r.email, r.role, r.type, r.category, r.score, r.percentage, r.tier, r.action, r.time_taken, r.want_to_learn || 0, ...ps, r.created_at].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
+      return [r.name, r.email, r.role, r.type, r.category, r.score, r.percentage, r.tier, r.action, r.time_taken, r.want_to_learn || 0, ...ps, r.suggestions || '', r.created_at].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
     });
     const csv = [headers.join(','), ...csvRows].join('\n');
     res.setHeader('Content-Type', 'text/csv');

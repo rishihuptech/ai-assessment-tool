@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 const ROLES = [
   'Shopify Developer',
   'WordPress Developer',
+  'MERN Stack Developer',
   'Front End Designer',
   'UI/UX Designer',
   'QA',
@@ -16,6 +17,7 @@ const ROLES = [
 const ROLE_CATEGORY_MAP = {
   'Shopify Developer': 'shopify_dev',
   'WordPress Developer': 'wordpress_dev',
+  'MERN Stack Developer': 'mern_dev',
   'Front End Designer': 'frontend_designer',
   'UI/UX Designer': 'uiux_designer',
   'QA': 'qa',

@@ -7,10 +7,12 @@ import questionsSEO from './questions-seo';
 import questionsPaidAds from './questions-paid-ads';
 import questionsPM from './questions-pm';
 import questionsHR from './questions-hr';
+import questionsMernDev from './questions-mern-dev';
 
 const questionSets = {
   shopify_dev: questionsShopifyDev,
   wordpress_dev: questionsWordpressDev,
+  mern_dev: questionsMernDev,
   frontend_designer: questionsFrontendDesigner,
   uiux_designer: questionsUiuxDesigner,
   qa: questionsQA,

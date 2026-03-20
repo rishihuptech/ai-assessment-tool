@@ -27,6 +27,9 @@ export default function TestPage() {
   const [answers, setAnswers] = useState(new Array(TOTAL_QUESTIONS).fill(-1));
   const [timeLeft, setTimeLeft] = useState(TOTAL_TIME);
   const [submitted, setSubmitted] = useState(false);
+  const [showSuggestionBox, setShowSuggestionBox] = useState(false);
+  const [suggestion, setSuggestion] = useState('');
+  const [pendingPayload, setPendingPayload] = useState(null);
 
   // Load session
   useEffect(() => {
@@ -44,7 +47,7 @@ export default function TestPage() {
     const elapsed = Math.floor((Date.now() - s.startTime) / 1000);
     const remaining = Math.max(0, TOTAL_TIME - elapsed);
     setTimeLeft(remaining);
-    if (remaining <= 0) handleSubmit(s, qs, s.answers);
+    if (remaining <= 0) handleSubmit(s, qs, s.answers, true);
   }, []);
 
   // Timer
@@ -65,7 +68,7 @@ export default function TestPage() {
   // Auto-submit at 0
   useEffect(() => {
     if (timeLeft === 0 && !submitted && session && questions.length) {
-      handleSubmit(session, questions, answers);
+      handleSubmit(session, questions, answers, true);
     }
   }, [timeLeft, submitted]);
 
@@ -84,16 +87,11 @@ export default function TestPage() {
     setAnswers(newAnswers);
   };
 
-  const handleSubmit = useCallback(async (sess, qs, ans) => {
-    if (submitted) return;
-    setSubmitted(true);
-    clearInterval(timerRef.current);
-
+  const buildPayload = useCallback((sess, qs, ans) => {
     const s = sess || session;
     const q = qs || questions;
     const a = ans || answers;
 
-    // Calculate scores
     let score = 0;
     let wantToLearnCount = 0;
     const pillarScores = [0, 0, 0, 0, 0, 0];
@@ -125,7 +123,7 @@ export default function TestPage() {
     const percentage = Math.round((score / TOTAL_QUESTIONS) * 100);
     const tierInfo = getTier(score);
 
-    const payload = {
+    return {
       name: s.name,
       email: s.email,
       role: s.role,
@@ -140,7 +138,9 @@ export default function TestPage() {
       details,
       want_to_learn: wantToLearnCount
     };
+  }, [session, questions, answers]);
 
+  const submitToServer = useCallback(async (payload) => {
     try {
       await fetch('/api/submit', {
         method: 'POST',
@@ -150,12 +150,83 @@ export default function TestPage() {
     } catch (e) {
       console.error('Submit failed:', e);
     }
-
     localStorage.removeItem('ai_test_session');
     navigate('/thanks');
-  }, [session, questions, answers, submitted, navigate]);
+  }, [navigate]);
+
+  const handleSubmit = useCallback(async (sess, qs, ans, isAutoSubmit = false) => {
+    if (submitted) return;
+    clearInterval(timerRef.current);
+
+    const s = sess || session;
+    const payload = buildPayload(s, qs, ans);
+
+    // For employees (not auto-submit from timer), show suggestion box first
+    if (s.type === 'team' && !isAutoSubmit && !showSuggestionBox) {
+      setShowSuggestionBox(true);
+      setPendingPayload(payload);
+      return;
+    }
+
+    setSubmitted(true);
+    await submitToServer(payload);
+  }, [session, questions, answers, submitted, navigate, buildPayload, submitToServer, showSuggestionBox]);
+
+  // Final submit with suggestion (employee flow)
+  const handleSuggestionSubmit = useCallback(async () => {
+    if (!pendingPayload) return;
+    setSubmitted(true);
+    const payload = { ...pendingPayload, suggestions: suggestion.trim() || '' };
+    await submitToServer(payload);
+  }, [pendingPayload, suggestion, submitToServer]);
 
   if (!session || !questions.length) return null;
+
+  // Suggestion box for employees (after Q20, before final submit)
+  if (showSuggestionBox) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-lg bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 bg-brand/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5.002 5.002 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">One Last Thing!</h2>
+            <p className="text-sm text-gray-500 leading-relaxed">
+              Do you have any suggestions for AI tools or workflows that could help us work better at HuptechWeb?
+            </p>
+          </div>
+
+          <textarea
+            value={suggestion}
+            onChange={e => setSuggestion(e.target.value)}
+            placeholder="E.g., &quot;I think we should try using Cursor for faster coding&quot; or &quot;AI-powered QA testing tools would save us time&quot;..."
+            className="w-full h-32 px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand resize-none mb-4"
+            autoFocus
+          />
+
+          <p className="text-xs text-gray-400 mb-5 text-center">This is optional — skip if you don't have any suggestions right now.</p>
+
+          <div className="flex gap-3">
+            <button
+              onClick={handleSuggestionSubmit}
+              className="flex-1 py-3 text-sm font-medium text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+            >
+              Skip & Submit
+            </button>
+            <button
+              onClick={handleSuggestionSubmit}
+              className="flex-1 py-3 text-sm font-semibold text-white bg-green-600 rounded-xl hover:bg-green-700 transition-colors"
+            >
+              Submit with Suggestion
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const q = questions[currentQ];
   const mins = Math.floor(timeLeft / 60);
